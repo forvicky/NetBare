@@ -17,6 +17,7 @@ import com.github.megatronking.netbare.injector.HttpInjector;
 import com.github.megatronking.netbare.ssl.JKS;
 import com.nlp.netbaredemo.injector.BaiduLogoInjector;
 import com.nlp.netbaredemo.injector.HttpUrlPrintInterceptor;
+import com.nlp.netbaredemo.injector.NLInjector;
 import com.nlp.netbaredemo.injector.WechatLocationInjector;
 
 import java.io.IOException;
@@ -103,7 +104,11 @@ public class MainActivity extends AppCompatActivity implements NetBareListener {
         HttpInterceptorFactory interceptor1 = HttpUrlPrintInterceptor.createFactory();
         HttpInterceptorFactory injector1 = HttpInjectInterceptor.createFactory((HttpInjector)(new BaiduLogoInjector(this)));
         HttpInterceptorFactory injector2 = HttpInjectInterceptor.createFactory((HttpInjector)(new WechatLocationInjector()));
-        return Arrays.asList(new HttpInterceptorFactory[]{interceptor1, injector1, injector2});
+        HttpInterceptorFactory injector3 = HttpInjectInterceptor.createFactory((HttpInjector)(new NLInjector()));
+
+//        return Arrays.asList(new HttpInterceptorFactory[]{interceptor1, injector1,injector2,injector3});
+
+        return Arrays.asList(new HttpInterceptorFactory[]{injector2,injector3});
     }
 
  

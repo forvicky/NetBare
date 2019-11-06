@@ -43,6 +43,12 @@ public class WechatLocationInjector extends SimpleHttpInjector {
     public void onResponseInject(HttpResponseHeaderPart header,InjectorCallback callback) {
         // 由于响应体大小不确定，这里先hold住header（需要在后面修改content-length）
         mHoldResponseHeader = header;
+
+        try {
+            Log.d(TAG,"响应头\n"+new String(header.toBuffer().array(),"UTF-8"));
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
     }
 
     @Override
