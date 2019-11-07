@@ -2,9 +2,9 @@ package com.nlp.netbaredemo.injector;
 
 import android.support.annotation.NonNull;
 import android.util.Log;
-
 import com.github.megatronking.netbare.NetBareUtils;
 import com.github.megatronking.netbare.http.HttpBody;
+import com.github.megatronking.netbare.http.HttpMethod;
 import com.github.megatronking.netbare.http.HttpRequest;
 import com.github.megatronking.netbare.http.HttpRequestHeaderPart;
 import com.github.megatronking.netbare.http.HttpResponse;
@@ -12,24 +12,44 @@ import com.github.megatronking.netbare.http.HttpResponseHeaderPart;
 import com.github.megatronking.netbare.injector.InjectorCallback;
 import com.github.megatronking.netbare.injector.SimpleHttpInjector;
 import com.github.megatronking.netbare.io.HttpBodyInputStream;
-import com.github.megatronking.netbare.stream.BufferStream;
 import com.github.megatronking.netbare.stream.ByteStream;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
-
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.Reader;
-import java.nio.ByteBuffer;
+import java.lang.reflect.Method;
 import java.util.List;
 import java.util.Map;
-import java.util.zip.DeflaterOutputStream;
 import java.util.zip.GZIPInputStream;
-import java.util.zip.InflaterInputStream;
 
 /**
+ * Content-Encoding: gzip       //压缩传输,GZIPInputStream
+ * Transfer-Encoding: chunked   //分块传输
+ *
+ *require('net').createServer(function(sock) {
+ *     sock.on('data', function(data) {
+ *         sock.write('HTTP/1.1 200 OK\r\n');
+ *         sock.write('Transfer-Encoding: chunked\r\n');
+ *         sock.write('\r\n');
+ *
+ *         sock.write('b\r\n');  //长度
+ *         sock.write('01234567890\r\n'); //实际内容
+ *
+ *         sock.write('5\r\n');
+ *         sock.write('12345\r\n');
+ *
+ *         sock.write('0\r\n');
+ *         sock.write('\r\n');
+ *     });
+ * }).listen(9090, '127.0.0.1');
+ *
+ *
+ * 方法1、先压缩再分块，逆向处理要先处理分块，再解压缩
+ * 方法2、请求头 mHttpRequestHeaderPart.newBuilder().replaceHeader("Accept-Encoding", "None").build()
+ *    响应头 mHttpResponseHeaderPart.newBuilder().replaceHeader("Accept-Encoding","None").build();
  * Created by zdd on 2019/11/5
  */
 public class NLInjector extends SimpleHttpInjector {
@@ -41,7 +61,8 @@ public class NLInjector extends SimpleHttpInjector {
     public boolean sniffRequest(HttpRequest request) {
 //        // 请求url匹配时才进行注入
         boolean shouldInject = request.url().startsWith("https://app.newland.com.cn") || request.url().startsWith("https://dapp.newland.com.cn");
-        return shouldInject;
+
+        return shouldInject&&HttpMethod.POST.equals(request.method());
 
     }
 
@@ -49,7 +70,7 @@ public class NLInjector extends SimpleHttpInjector {
     public boolean sniffResponse(HttpResponse response) {
         // 请求url匹配时才进行注入
         boolean shouldInject = response.url().startsWith("https://app.newland.com.cn") || response.url().startsWith("https://dapp.newland.com.cn");
-        return shouldInject;
+        return shouldInject&&HttpMethod.POST.equals(response.method());
     }
 
     @Override
@@ -97,14 +118,21 @@ public class NLInjector extends SimpleHttpInjector {
             byte[] injectBodyData = bos.toByteArray();
             // 更新header的content-length
             HttpRequestHeaderPart injectHeader = mHttpRequestHeaderPart.newBuilder()
+                    .replaceHeader("Accept-Encoding","None")
                     .replaceHeader("Content-Length", String.valueOf(injectBodyData.length))
                     .build();
-            // 先将header发射出去
-            callback.onFinished(injectHeader);
-            // 再将响应体发射出去
-            callback.onFinished(new ByteStream(injectBodyData));
-            Log.i(TAG, "Inject NLInjector location completed!");
+
+            if(!mHttpRequestHeaderPart.uri().toString().contains("behavior-logs")){
+                // 先将header发射出去
+                callback.onFinished(injectHeader);
+                // 再将响应体发射出去
+                callback.onFinished(new ByteStream(injectBodyData));
+                Log.i(TAG, "Inject NLInjector location completed!");
+            }
+
+
         } catch (Exception e) {
+            Log.e(TAG,e.getMessage());
             e.printStackTrace();
         } finally {
             NetBareUtils.closeQuietly(his);
@@ -120,8 +148,12 @@ public class NLInjector extends SimpleHttpInjector {
         try {
             mHttpResponseHeaderPart = header;
             Log.d(TAG, "响应头\n" + new String(header.toBuffer().array(), "UTF-8"));
-            callback.onFinished(header);
+            HttpResponseHeaderPart injectHeader = mHttpResponseHeaderPart.newBuilder()
+                    .replaceHeader("Accept-Encoding","None")
+                    .build();
+            callback.onFinished(injectHeader);
         } catch (IOException e) {
+            Log.e(TAG,e.getMessage());
             e.printStackTrace();
         }
 
@@ -136,27 +168,28 @@ public class NLInjector extends SimpleHttpInjector {
         try {
             Log.d(TAG, "响应体\n" + new String(body.toBuffer().array()));
 
-            if (isGzip(mHttpResponseHeaderPart)) {
-                HttpBodyInputStream his = null;
-                Reader reader = null;
-                try {
-                    his = new HttpBodyInputStream(body);
-
-                    reader = new InputStreamReader(new GZIPInputStream(his));
-                    JsonElement element = new JsonParser().parse(reader);
-                    Log.d(TAG, "响应体\n" + element.toString());
-                } catch (Exception e) {
-                    Log.e(TAG,e.getMessage());
-                    e.printStackTrace();
-                } finally {
-                    NetBareUtils.closeQuietly(his);
-                    NetBareUtils.closeQuietly(reader);
-                }
-
-            }
+//            if (isGzip(mHttpResponseHeaderPart)) {
+//                HttpBodyInputStream his = null;
+//                Reader reader = null;
+//                try {
+//                    his = new HttpBodyInputStream(body);
+//
+//                    reader = new InputStreamReader(new GZIPInputStream(his));
+//                    JsonElement element = new JsonParser().parse(reader);
+//                    Log.d(TAG, "响应体\n" + element.toString());
+//                } catch (Exception e) {
+//                    Log.e(TAG,e.getMessage());
+//                    e.printStackTrace();
+//                } finally {
+//                    NetBareUtils.closeQuietly(his);
+//                    NetBareUtils.closeQuietly(reader);
+//                }
+//
+//            }
 
             callback.onFinished(body);
         } catch (IOException e) {
+            Log.e(TAG,e.getMessage());
             e.printStackTrace();
         }
     }
