@@ -107,10 +107,10 @@ public class NLInjector extends SimpleHttpInjector {
 
             JsonObject location = element.getAsJsonObject();
 
-            if (location.has("coordinate")) {
-                location.addProperty("coordinate", "119.411478,26.018372");
-                Log.d(TAG, "修改后新大陆=" + element.toString());
-            }
+//            if (location.has("coordinate")) {
+//                location.addProperty("coordinate", "119.411478,26.018372");
+//                Log.d(TAG, "修改后新大陆=" + element.toString());
+//            }
 
 
             bos.write(element.toString().getBytes());

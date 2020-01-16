@@ -14,9 +14,15 @@ import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import java.io.ByteArrayOutputStream;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.Reader;
+import java.math.BigDecimal;
+import java.util.Random;
 import java.util.zip.DeflaterOutputStream;
 import java.util.zip.InflaterInputStream;
 
@@ -33,6 +39,10 @@ public class WechatLocationInjector extends SimpleHttpInjector {
     public boolean sniffResponse(HttpResponse response){
         // 请求url匹配时才进行注入
         boolean shouldInject = response.url().startsWith("https://lbs.map.qq.com/loc");
+
+//        boolean shouldInject = response.url().contains("qq");
+
+
         if (shouldInject) {
             Log.i(TAG, "Start wechat location injection!");
         }
@@ -45,11 +55,15 @@ public class WechatLocationInjector extends SimpleHttpInjector {
         mHoldResponseHeader = header;
 
         try {
+            Log.d(TAG,"响应url="+header.uri());
             Log.d(TAG,"响应头\n"+new String(header.toBuffer().array(),"UTF-8"));
         } catch (IOException e) {
             e.printStackTrace();
         }
     }
+
+
+
 
     @Override
     public void onResponseInject(HttpResponse response,HttpBody body,InjectorCallback callback) {
@@ -76,9 +90,21 @@ public class WechatLocationInjector extends SimpleHttpInjector {
             }
             // 替换经纬度，这里是珠峰的经纬度，装逼很厉害的地方
             JsonObject location = locationNode.getAsJsonObject();
-            location.addProperty("latitude", 27.99136f);
-            location.addProperty("longitude", 86.88915f);
+
+            Random random=new Random();
+            BigDecimal latitudeBD=new BigDecimal("26.0212");
+            BigDecimal longitudeBD=new BigDecimal("119.4061");
+
+            latitudeBD=latitudeBD.add(new BigDecimal((random.nextInt(99)+1)/1000000.0));
+            longitudeBD=longitudeBD.add(new BigDecimal((random.nextInt(99)+1)/1000000.0));
+
+            location.addProperty("latitude", latitudeBD.doubleValue());
+            location.addProperty("longitude", longitudeBD.doubleValue());
+
+//            location.addProperty("latitude", 26.02108f);
+//            location.addProperty("longitude", 119.40678f);
             String injectedBody = element.toString();
+            Log.d(TAG,"修改后="+injectedBody);
             // 重新使用zlib编码
             bos =new ByteArrayOutputStream();
             fos = new DeflaterOutputStream(bos);
