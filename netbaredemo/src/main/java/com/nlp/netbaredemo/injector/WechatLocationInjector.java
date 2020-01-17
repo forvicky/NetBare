@@ -92,7 +92,7 @@ public class WechatLocationInjector extends SimpleHttpInjector {
             JsonObject location = locationNode.getAsJsonObject();
 
             Random random=new Random();
-            BigDecimal latitudeBD=new BigDecimal("26.0212");
+            BigDecimal latitudeBD=new BigDecimal("26.0212");   //4G用的应该是基站的位置，wifi才能精准定位
             BigDecimal longitudeBD=new BigDecimal("119.4061");
 
             latitudeBD=latitudeBD.add(new BigDecimal((random.nextInt(99)+1)/1000000.0));
